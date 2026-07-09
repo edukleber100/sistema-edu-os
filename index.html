@@ -307,7 +307,7 @@ button.secondary:hover{border-color:rgba(255,255,255,0.2);}
     <div style="display:flex; gap:22px; flex-wrap:wrap; flex:1;">
       <div style="display:flex; align-items:center; gap:8px; font-size:12.5px;">
         <span style="color:var(--gold); font-family:var(--num); font-weight:700;">+300 XP</span>
-        <span style="color:var(--text-sec);">manter o déficit diário</span>
+        <span style="color:var(--text-sec);" id="xpGoalLabel">manter o déficit diário</span>
       </div>
       <div style="display:flex; align-items:center; gap:8px; font-size:12.5px;">
         <span style="color:var(--gold); font-family:var(--num); font-weight:700;">+100 XP</span>
@@ -360,9 +360,9 @@ button.secondary:hover{border-color:rgba(255,255,255,0.2);}
       </div>
     </div>
     <div class="card attr-card attr-card-big">
-      <div class="attr-badge attr-badge-big" style="background:var(--blue-soft); color:var(--blue);">DF</div>
+      <div class="attr-badge attr-badge-big" id="attrDeficitBadge" style="background:var(--blue-soft); color:var(--blue);">DF</div>
       <div class="attr-info">
-        <div class="attr-name">Déficit Atual</div>
+        <div class="attr-name" id="attrDeficitName">Déficit Atual</div>
         <div class="attr-value attr-value-big" id="attrDeficitValue">0 / 0 kcal</div>
         <div class="attr-track attr-track-big"><div class="attr-fill" id="attrDeficitBar" style="width:0%; background:var(--blue);"></div></div>
       </div>
@@ -375,8 +375,8 @@ button.secondary:hover{border-color:rgba(255,255,255,0.2);}
     <div class="detail-grid">
       <div class="detail-row"><span class="dl">Calorias ingeridas</span><span class="dv" id="dtKcal">--</span></div>
       <div class="detail-row"><span class="dl">Gasto estimado</span><span class="dv" id="dtGasto">--</span></div>
-      <div class="detail-row"><span class="dl">Déficit atual / meta</span><span class="dv" id="dtDeficit">--</span></div>
-      <div class="detail-row"><span class="dl">Kcal até manutenção</span><span class="dv" id="dtCofre">--</span></div>
+      <div class="detail-row"><span class="dl" id="dtDeficitLabel">Déficit atual / meta</span><span class="dv" id="dtDeficit">--</span></div>
+      <div class="detail-row"><span class="dl" id="dtCofreLabel">Kcal até manutenção</span><span class="dv" id="dtCofre">--</span></div>
       <div class="detail-row"><span class="dl">Proteínas</span><span class="dv" id="dtProt">--</span></div>
       <div class="detail-row"><span class="dl">Carboidratos</span><span class="dv" id="dtCarb">--</span></div>
       <div class="detail-row"><span class="dl">Gorduras</span><span class="dv" id="dtGord">--</span></div>
@@ -502,8 +502,15 @@ button.secondary:hover{border-color:rgba(255,255,255,0.2);}
         <label>Sexo biológico</label>
         <select id="obSexo"><option value="M">Masculino</option><option value="F">Feminino</option></select>
       </div>
-      <div class="field"><label>Déficit mínimo diário (kcal)</label><input type="number" id="obDeficit" step="10" value="700"></div>
+      <div class="field">
+        <label>Objetivo</label>
+        <select id="obTipoObjetivo">
+          <option value="deficit">Perder peso (déficit)</option>
+          <option value="superavit">Ganhar peso (superávit)</option>
+        </select>
+      </div>
     </div>
+    <div class="field"><label id="obDeficitLabel">Déficit mínimo diário (kcal)</label><input type="number" id="obDeficit" step="10" value="700"></div>
     <div class="field"><label>Proteína mínima diária (g)</label><input type="number" id="obProteina" step="5" value="130"></div>
     <div class="hint" style="color:#F87171; display:none;" id="obError"></div>
     <button class="primary" id="btnStartMission" style="margin-top:6px;">Começar jornada</button>
@@ -532,7 +539,14 @@ button.secondary:hover{border-color:rgba(255,255,255,0.2);}
     </div>
     <div class="hint" id="cfgGastoPreview">Gasto de manutenção estimado: -- kcal</div>
     <div class="hint">Este é o gasto em dia de descanso. Atividade real é lançada na aba Treino, que soma o gasto extra por cima.</div>
-    <div class="field" style="margin-top:14px;"><label>Déficit mínimo diário (kcal)</label><input type="number" id="cfgDeficitMeta" step="10"></div>
+    <div class="field" style="margin-top:14px;">
+      <label>Objetivo</label>
+      <select id="cfgTipoObjetivo">
+        <option value="deficit">Perder peso (déficit)</option>
+        <option value="superavit">Ganhar peso (superávit)</option>
+      </select>
+    </div>
+    <div class="field"><label id="cfgDeficitLabel">Déficit mínimo diário (kcal)</label><input type="number" id="cfgDeficitMeta" step="10"></div>
     <div class="field"><label>Proteína mínima diária (g)</label><input type="number" id="cfgProteinaMeta" step="5"></div>
     <button class="primary" id="btnSaveSettings">Salvar parâmetros</button>
 
@@ -689,12 +703,13 @@ async function checkDeficitReward(){
   const t = computeTotals();
   const gastoBase = computeGastoBase();
   const gastoTotal = gastoBase + t.treinoKcal;
-  const deficitAtual = gastoTotal - t.kcal;
+  const isGanho = profile.tipoObjetivo === 'superavit';
+  const resultadoAtual = isGanho ? (t.kcal - gastoTotal) : (gastoTotal - t.kcal);
 
-  if(!day.deficitAwarded && deficitAtual >= profile.deficitMeta){
+  if(!day.deficitAwarded && resultadoAtual >= profile.deficitMeta){
     day.deficitAwarded = true;
     await saveDay();
-    await awardXP(300, 'Déficit do dia mantido');
+    await awardXP(300, isGanho ? 'Superávit do dia mantido' : 'Déficit do dia mantido');
   }
 
   if(!day.metaProteinaCounted && t.prot >= profile.proteinaMeta){
@@ -795,9 +810,16 @@ function showOnboarding(fromSelector){
   document.getElementById('obObjetivo').value=''; document.getElementById('obAltura').value='';
   document.getElementById('obIdade').value=''; document.getElementById('obDeficit').value=700;
   document.getElementById('obProteina').value=130;
+  document.getElementById('obTipoObjetivo').value='deficit';
+  document.getElementById('obDeficitLabel').textContent='Déficit mínimo diário (kcal)';
   document.getElementById('obError').textContent=''; document.getElementById('obError').style.display='none';
   document.getElementById('onboardingOverlay').classList.add('open');
 }
+
+document.getElementById('obTipoObjetivo').addEventListener('change', (e)=>{
+  document.getElementById('obDeficitLabel').textContent = e.target.value === 'superavit'
+    ? 'Superávit mínimo diário (kcal)' : 'Déficit mínimo diário (kcal)';
+});
 
 async function completeOnboarding(){
   const nome = document.getElementById('obNome').value.trim();
@@ -806,6 +828,7 @@ async function completeOnboarding(){
   const altura = parseFloat(document.getElementById('obAltura').value);
   const idade = parseFloat(document.getElementById('obIdade').value);
   const sexo = document.getElementById('obSexo').value;
+  const tipoObjetivo = document.getElementById('obTipoObjetivo').value;
   const deficitMeta = parseFloat(document.getElementById('obDeficit').value) || 700;
   const proteinaMeta = parseFloat(document.getElementById('obProteina').value) || 130;
 
@@ -814,11 +837,21 @@ async function completeOnboarding(){
     document.getElementById('obError').style.display = 'block';
     return;
   }
+  if(tipoObjetivo === 'deficit' && pesoObjetivoVal >= pesoAtualVal){
+    document.getElementById('obError').textContent = 'Para perder peso, o peso objetivo deve ser menor que o peso atual.';
+    document.getElementById('obError').style.display = 'block';
+    return;
+  }
+  if(tipoObjetivo === 'superavit' && pesoObjetivoVal <= pesoAtualVal){
+    document.getElementById('obError').textContent = 'Para ganhar peso, o peso objetivo deve ser maior que o peso atual.';
+    document.getElementById('obError').style.display = 'block';
+    return;
+  }
 
   const id = uid();
   profile = {
     nomeOperador: nome, pesoInicial: pesoAtualVal, pesoObjetivo: pesoObjetivoVal,
-    altura, idade, sexo, deficitMeta, proteinaMeta,
+    altura, idade, sexo, tipoObjetivo, deficitMeta, proteinaMeta,
     xp:0, streakCount:0, workoutsCount:0, proteinGoalHitCount:0,
     createdDate: todayISO(), lastActiveDate: null, lastWeeklyRewardWeek: null
   };
@@ -852,6 +885,7 @@ async function loadAll(){
 
   if(profile.altura === undefined){ profile.altura=175; profile.idade=30; profile.sexo='M'; }
   if(profile.nomeOperador === undefined) profile.nomeOperador = 'Personagem';
+  if(profile.tipoObjetivo === undefined) profile.tipoObjetivo = 'deficit';
   if(profile.xp === undefined) profile.xp = 0;
   if(profile.streakCount === undefined) profile.streakCount = 0;
   if(profile.workoutsCount === undefined) profile.workoutsCount = 0;
@@ -899,9 +933,12 @@ function render(){
   const pa = pesoAtual();
   const pi = profile.pesoInicial;
   const po = profile.pesoObjetivo;
-  const totalAPerder = pi - po;
-  const jaPerdido = pi - pa;
-  const pct = totalAPerder > 0 ? clamp01(jaPerdido/totalAPerder) : 0;
+  const isGanho = profile.tipoObjetivo === 'superavit';
+
+  const totalMudanca = isGanho ? (po - pi) : (pi - po);
+  const progresso = isGanho ? (pa - pi) : (pi - pa);
+  const pct = totalMudanca > 0 ? clamp01(progresso/totalMudanca) : 0;
+  const metaAlcancada = isGanho ? (pa >= po) : (pa <= po);
 
   const li = levelInfo(profile.xp||0);
   document.getElementById('charLevel').textContent = li.level;
@@ -914,48 +951,69 @@ function render(){
   const rank = getRank(pct);
   const nextRank = getNextRank(pct);
   document.getElementById('charRank').textContent = 'Rank ' + rank.name;
-  if(pa <= po){
+  const verbo = isGanho ? 'Ganhar' : 'Perder';
+  if(metaAlcancada){
     document.getElementById('missionAtual').innerHTML = '<b>Meta de peso alcançada.</b> Continue mantendo a forma para preservar seu rank.';
   } else if(nextRank){
-    const pesoAlvoRank = pi - totalAPerder*nextRank.min;
-    const kgParaRank = Math.max(0, pa - pesoAlvoRank);
-    document.getElementById('missionAtual').innerHTML = 'Missão atual: <b>Perder mais ' + round1(kgParaRank) + ' kg</b> para alcançar Rank ' + nextRank.name + '.';
+    const pesoAlvoRank = isGanho ? (pi + totalMudanca*nextRank.min) : (pi - totalMudanca*nextRank.min);
+    const kgParaRank = isGanho ? Math.max(0, pesoAlvoRank - pa) : Math.max(0, pa - pesoAlvoRank);
+    document.getElementById('missionAtual').innerHTML = 'Missão atual: <b>' + verbo + ' mais ' + round1(kgParaRank) + ' kg</b> para alcançar Rank ' + nextRank.name + '.';
   } else {
     document.getElementById('missionAtual').innerHTML = '<b>Rank Diamante alcançado.</b> Continue evoluindo.';
   }
 
   document.getElementById('statPesoInicial').textContent = round1(pi) + ' kg';
   document.getElementById('statPeso').textContent = round1(pa) + ' kg';
-  document.getElementById('statPesoSub').textContent = round1(jaPerdido) + ' kg eliminados até agora';
+  document.getElementById('statPesoSub').textContent = round1(Math.abs(progresso)) + ' kg ' + (isGanho ? 'ganhos' : 'eliminados') + ' até agora';
   document.getElementById('statMeta').textContent = round1(po) + ' kg';
   document.getElementById('statProgresso').textContent = Math.round(pct*100) + '%';
-  document.getElementById('statProgressoSub').textContent = pa > po ? ('Faltam ' + round1(pa-po) + ' kg') : 'Meta alcançada';
+  document.getElementById('statProgressoSub').textContent = metaAlcancada ? 'Meta alcançada' : ('Faltam ' + round1(Math.abs(pa-po)) + ' kg');
+
+  document.getElementById('xpGoalLabel').textContent = 'manter o ' + (isGanho ? 'superávit' : 'déficit') + ' diário';
+  document.getElementById('attrDeficitName').textContent = isGanho ? 'Superávit Atual' : 'Déficit Atual';
+  document.getElementById('attrDeficitBadge').textContent = isGanho ? 'SP' : 'DF';
+  document.getElementById('dtDeficitLabel').textContent = (isGanho ? 'Superávit' : 'Déficit') + ' atual / meta';
 
   const t = computeTotals();
   const gastoBase = computeGastoBase();
   const gastoTotal = gastoBase + t.treinoKcal;
   const deficitAtual = gastoTotal - t.kcal;
+  const superavitAtual = t.kcal - gastoTotal;
+  const resultadoAtual = isGanho ? superavitAtual : deficitAtual;
   const cofre = gastoTotal - t.kcal;
-  const cofreDeficit = gastoTotal - profile.deficitMeta - t.kcal;
 
   document.getElementById('dtKcal').textContent = Math.round(t.kcal) + ' kcal';
   document.getElementById('dtGasto').textContent = Math.round(gastoTotal) + ' kcal';
-  document.getElementById('dtDeficit').textContent = Math.round(deficitAtual) + ' / ' + profile.deficitMeta + ' kcal';
-  document.getElementById('dtCofre').textContent = Math.round(cofre) + ' kcal';
+  document.getElementById('dtDeficit').textContent = Math.round(resultadoAtual) + ' / ' + profile.deficitMeta + ' kcal';
+  if(isGanho){
+    document.getElementById('dtCofreLabel').textContent = 'Kcal acima da manutenção';
+    document.getElementById('dtCofre').textContent = Math.round(-cofre) + ' kcal';
+  } else {
+    document.getElementById('dtCofreLabel').textContent = 'Kcal até manutenção';
+    document.getElementById('dtCofre').textContent = Math.round(cofre) + ' kcal';
+  }
   document.getElementById('dtProt').textContent = round1(t.prot) + ' / ' + profile.proteinaMeta + ' g';
   document.getElementById('dtCarb').textContent = round1(t.carb) + ' g';
   document.getElementById('dtGord').textContent = round1(t.gord) + ' g';
 
   /* attributes */
-  const energiaMax = Math.max(gastoTotal - profile.deficitMeta, 1);
-  document.getElementById('attrEnergiaValue').textContent = Math.max(0,Math.round(cofreDeficit)) + ' kcal p/ bater o déficit';
-  document.getElementById('attrEnergiaBar').style.width = Math.round(clamp01(cofreDeficit/energiaMax)*100) + '%';
+  if(isGanho){
+    const metaIngestao = gastoTotal + profile.deficitMeta;
+    const faltamParaMeta = Math.max(0, metaIngestao - t.kcal);
+    document.getElementById('attrEnergiaValue').textContent = Math.round(faltamParaMeta) + ' kcal p/ bater o superávit';
+    document.getElementById('attrEnergiaBar').style.width = Math.round(clamp01(t.kcal/Math.max(metaIngestao,1))*100) + '%';
+  } else {
+    const cofreDeficit = gastoTotal - profile.deficitMeta - t.kcal;
+    const energiaMax = Math.max(gastoTotal - profile.deficitMeta, 1);
+    document.getElementById('attrEnergiaValue').textContent = Math.max(0,Math.round(cofreDeficit)) + ' kcal p/ bater o déficit';
+    document.getElementById('attrEnergiaBar').style.width = Math.round(clamp01(cofreDeficit/energiaMax)*100) + '%';
+  }
 
   document.getElementById('attrProteinaValue').textContent = round1(t.prot) + ' / ' + profile.proteinaMeta + ' g';
   document.getElementById('attrProteinaBar').style.width = Math.round(clamp01(t.prot/profile.proteinaMeta)*100) + '%';
 
-  document.getElementById('attrDeficitValue').textContent = Math.round(deficitAtual) + ' / ' + profile.deficitMeta + ' kcal';
-  document.getElementById('attrDeficitBar').style.width = Math.round(clamp01(deficitAtual/profile.deficitMeta)*100) + '%';
+  document.getElementById('attrDeficitValue').textContent = Math.round(resultadoAtual) + ' / ' + profile.deficitMeta + ' kcal';
+  document.getElementById('attrDeficitBar').style.width = Math.round(clamp01(resultadoAtual/profile.deficitMeta)*100) + '%';
 
   renderLog();
 }
@@ -1205,10 +1263,17 @@ document.getElementById('btnSettings').addEventListener('click', ()=>{
   document.getElementById('cfgAltura').value = profile.altura;
   document.getElementById('cfgIdade').value = profile.idade;
   document.getElementById('cfgSexo').value = profile.sexo;
+  document.getElementById('cfgTipoObjetivo').value = profile.tipoObjetivo || 'deficit';
+  document.getElementById('cfgDeficitLabel').textContent = (profile.tipoObjetivo === 'superavit')
+    ? 'Superávit mínimo diário (kcal)' : 'Déficit mínimo diário (kcal)';
   document.getElementById('cfgDeficitMeta').value = profile.deficitMeta;
   document.getElementById('cfgProteinaMeta').value = profile.proteinaMeta;
   updateGastoPreview();
   settingsModal.classList.add('open');
+});
+document.getElementById('cfgTipoObjetivo').addEventListener('change', (e)=>{
+  document.getElementById('cfgDeficitLabel').textContent = e.target.value === 'superavit'
+    ? 'Superávit mínimo diário (kcal)' : 'Déficit mínimo diário (kcal)';
 });
 ['cfgAltura','cfgIdade','cfgSexo'].forEach(id=>{
   document.getElementById(id).addEventListener('input', updateGastoPreview);
@@ -1224,8 +1289,11 @@ document.getElementById('btnSaveSettings').addEventListener('click', async ()=>{
   profile.altura = parseFloat(document.getElementById('cfgAltura').value) || profile.altura;
   profile.idade = parseFloat(document.getElementById('cfgIdade').value) || profile.idade;
   profile.sexo = document.getElementById('cfgSexo').value;
+  profile.tipoObjetivo = document.getElementById('cfgTipoObjetivo').value;
   profile.deficitMeta = parseFloat(document.getElementById('cfgDeficitMeta').value) || profile.deficitMeta;
   profile.proteinaMeta = parseFloat(document.getElementById('cfgProteinaMeta').value) || profile.proteinaMeta;
+  day.deficitAwarded = false;
+  await saveDay();
   await saveProfile();
   settingsModal.classList.remove('open');
   render();
@@ -1235,8 +1303,6 @@ document.getElementById('btnSwitchOperator').addEventListener('click', ()=>{
   settingsModal.classList.remove('open');
   showOperatorSelect();
 });
-
-// SISTEMA EDU DE CONTROLE CORPORAL
 
 bootstrap();
 </script>
