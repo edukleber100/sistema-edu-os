@@ -1,6 +1,6 @@
 # Sistema de Controle Corporal
 
-Sistema web desenvolvido para auxiliar no controle e acompanhamento corporais, permitindo registrar informações importantes para monitorar a evolução física de forma simples e organizada.
+Sistema web desenvolvido para auxiliar no controle e acompanhamento corporal, permitindo registrar informações importantes para monitorar a evolução física de forma simples e organizada.
 
 ## 📋 Funcionalidades
 
@@ -17,7 +17,7 @@ Sistema web desenvolvido para auxiliar no controle e acompanhamento corporais, p
 
 ## 📂 Estrutura do Projeto
 
-```
+```text
 /
 ├── index.html
 ├── README.md
@@ -52,9 +52,13 @@ Este projeto foi desenvolvido com o objetivo de facilitar o acompanhamento corpo
 
 **Eduardo Kleber**
 
-GitHub:
+GitHub:  
 https://github.com/edukleber100
 
 ---
 
-Projeto desenvolvido para ajudar no controle corporal.
+## 🤖 Desenvolvimento
+
+Este projeto foi desenvolvido utilizando **Claude Code**, com apoio de inteligência artificial para acelerar o desenvolvimento, organização do código e implementação de funcionalidades.
+
+Projeto desenvolvido para fins ajuda no acompanhamento do controle corporal.
