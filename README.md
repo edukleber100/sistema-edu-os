@@ -57,4 +57,4 @@ https://github.com/edukleber100
 
 ---
 
-Projeto desenvolvido para fins de estudo e prática de desenvolvimento web.
+Projeto desenvolvido para ajudar no controle corporal.
