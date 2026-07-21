@@ -148,6 +148,14 @@ body{padding:28px 20px 60px; min-height:100vh;}
 .detail-row .dl{color:var(--text-sec);}
 .detail-row .dv{font-family:var(--num); font-weight:600;}
 
+/* CHARTS */
+.chart-card{margin-bottom:14px;}
+.chart-title{font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-sec); margin-bottom:14px;}
+.chart-box{position:relative; height:220px;}
+.chart-box-sm{height:180px;}
+.dash-row{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;}
+@media(max-width:720px){.dash-row{grid-template-columns:1fr;}}
+
 /* REGISTRATION PANEL */
 .tabs{display:flex; gap:8px; margin-bottom:16px; background:var(--surface); padding:4px; border-radius:12px;}
 .tab-btn{
@@ -383,6 +391,23 @@ button.secondary:hover{border-color:rgba(255,255,255,0.2);}
     </div>
   </div>
 
+  <!-- HISTORY / CHARTS -->
+  <div class="section-title"><h2>Histórico</h2><span class="eyebrow" id="historyEyebrow">SQLite local</span></div>
+  <div class="card chart-card">
+    <div class="chart-title">Evolução de Peso</div>
+    <div class="chart-box"><canvas id="chartPeso"></canvas></div>
+  </div>
+  <div class="dash-row">
+    <div class="card chart-card">
+      <div class="chart-title" id="chartDeficitTitle">Histórico de Déficit</div>
+      <div class="chart-box chart-box-sm"><canvas id="chartDeficit"></canvas></div>
+    </div>
+    <div class="card chart-card">
+      <div class="chart-title">Calorias Diárias</div>
+      <div class="chart-box chart-box-sm"><canvas id="chartCalorias"></canvas></div>
+    </div>
+  </div>
+
   <!-- REGISTRATION -->
   <div class="section-title"><h2>Registrar Evento</h2><span class="eyebrow">Ganhe XP</span></div>
   <div class="card">
@@ -565,6 +590,8 @@ button.secondary:hover{border-color:rgba(255,255,255,0.2);}
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
 <script>
 const FOODS = {
   "whey":{label:"Whey protein", unitType:"scoop", gramsPerUnit:30, kcal:120, prot:24, carb:3, gord:1},
@@ -628,18 +655,264 @@ const hasCloudStorage = !!(window.storage && typeof window.storage.get === 'func
 
 async function storeGet(key){
   if(hasCloudStorage){ try{ return await window.storage.get(key); } catch(e){ return null; } }
-  const raw = localStorage.getItem(key);
-  return raw ? {key, value: raw} : null;
+  try{ const raw = localStorage.getItem(key); return raw ? {key, value: raw} : null; }
+  catch(e){ return null; }
 }
 async function storeSet(key, value){
   if(hasCloudStorage){ try{ return await window.storage.set(key, value); } catch(e){ return null; } }
-  localStorage.setItem(key, value);
-  return {key, value};
+  try{ localStorage.setItem(key, value); return {key, value}; }
+  catch(e){ return null; }
 }
 async function storeDelete(key){
   if(hasCloudStorage){ try{ return await window.storage.delete(key); } catch(e){ return null; } }
-  localStorage.removeItem(key);
-  return {key, deleted:true};
+  try{ localStorage.removeItem(key); return {key, deleted:true}; }
+  catch(e){ return null; }
+}
+async function storeList(prefix){
+  if(hasCloudStorage){
+    try{ const r = await window.storage.list(prefix, false); return r ? r.keys : []; }
+    catch(e){ return []; }
+  }
+  try{
+    const keys = [];
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.indexOf(prefix)===0) keys.push(k);
+    }
+    return keys;
+  }catch(e){ return []; }
+}
+
+/* ---------- SQLITE (sql.js) — histórico e gráficos ---------- */
+let SQL = null;
+let sqlDb = null;
+let sqliteReady = false;
+let chartPesoInstance = null;
+let chartDeficitInstance = null;
+let chartCaloriasInstance = null;
+
+function keySqliteDb(id){ return 'sqlite-db:' + id; }
+
+function u8ToBase64(u8){
+  let binary = '';
+  const chunk = 0x8000;
+  for(let i=0; i<u8.length; i+=chunk){
+    binary += String.fromCharCode.apply(null, u8.subarray(i, i+chunk));
+  }
+  return btoa(binary);
+}
+function base64ToU8(b64){
+  const binary = atob(b64);
+  const u8 = new Uint8Array(binary.length);
+  for(let i=0; i<binary.length; i++) u8[i] = binary.charCodeAt(i);
+  return u8;
+}
+
+async function initSqlite(){
+  sqliteReady = false;
+  try{
+    if(!SQL){
+      SQL = await initSqlJs({ locateFile: file => 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/' + file });
+    }
+    const saved = await storeGet(keySqliteDb(currentOperatorId));
+    if(saved){
+      sqlDb = new SQL.Database(base64ToU8(saved.value));
+    } else {
+      sqlDb = new SQL.Database();
+    }
+    sqlDb.run(`CREATE TABLE IF NOT EXISTS daily (
+      date TEXT PRIMARY KEY,
+      kcal REAL, prot REAL, carb REAL, gord REAL,
+      gasto_total REAL, resultado REAL, meta REAL, hit INTEGER,
+      peso REAL
+    );`);
+    sqliteReady = true;
+    if(!profile.sqliteBackfilled){
+      await backfillHistoricalData();
+      profile.sqliteBackfilled = true;
+      await saveProfile();
+      await persistDb();
+    }
+  }catch(e){
+    console.warn('SQLite indisponível, histórico/gráficos desativados:', e);
+    sqliteReady = false;
+  }
+}
+
+async function persistDb(){
+  if(!sqliteReady || !sqlDb) return;
+  try{
+    const bytes = sqlDb.export();
+    await storeSet(keySqliteDb(currentOperatorId), u8ToBase64(bytes));
+  }catch(e){ console.warn('Falha ao salvar banco SQLite:', e); }
+}
+
+function weightOnOrBefore(dateIso){
+  let candidate = null;
+  weightLog.forEach(w=>{
+    if(w.date <= dateIso){ if(!candidate || w.date > candidate.date) candidate = w; }
+  });
+  return candidate ? candidate.peso : (weightLog.length ? weightLog[0].peso : profile.pesoInicial);
+}
+
+function computeGastoBaseForWeight(peso){
+  const bmr = profile.sexo === 'F'
+    ? (447.593 + 9.247*peso + 3.098*profile.altura - 4.330*profile.idade)
+    : (88.362 + 13.397*peso + 4.799*profile.altura - 5.677*profile.idade);
+  return Math.round(bmr * 1.2);
+}
+
+async function upsertDailyRow(dateIso, refeicoes, treinos, pesoDoDia){
+  if(!sqliteReady) return;
+  let kcal=0, prot=0, carb=0, gord=0, treinoKcal=0;
+  (refeicoes||[]).forEach(r=>{ kcal+=r.kcal||0; prot+=r.prot||0; carb+=r.carb||0; gord+=r.gord||0; });
+  (treinos||[]).forEach(t=>{ treinoKcal += t.kcal||0; });
+  const peso = pesoDoDia !== undefined && pesoDoDia !== null ? pesoDoDia : weightOnOrBefore(dateIso);
+  const gastoBase = computeGastoBaseForWeight(peso);
+  const gastoTotal = gastoBase + treinoKcal;
+  const isGanho = profile.tipoObjetivo === 'superavit';
+  const resultado = isGanho ? (kcal - gastoTotal) : (gastoTotal - kcal);
+  const meta = profile.deficitMeta;
+  const hit = resultado >= meta ? 1 : 0;
+  try{
+    sqlDb.run(
+      `INSERT INTO daily (date, kcal, prot, carb, gord, gasto_total, resultado, meta, hit, peso)
+       VALUES (?,?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(date) DO UPDATE SET kcal=excluded.kcal, prot=excluded.prot, carb=excluded.carb, gord=excluded.gord,
+         gasto_total=excluded.gasto_total, resultado=excluded.resultado, meta=excluded.meta, hit=excluded.hit, peso=excluded.peso;`,
+      [dateIso, kcal, prot, carb, gord, gastoTotal, resultado, meta, hit, peso]
+    );
+  }catch(e){ console.warn('Falha ao gravar dia no SQLite:', e); }
+}
+
+async function syncTodayToSqlite(){
+  if(!sqliteReady) return;
+  await upsertDailyRow(todayISO(), day.refeicoes, day.treinos, pesoAtual());
+  await persistDb();
+  renderCharts();
+}
+
+async function backfillHistoricalData(){
+  const prefix = keyDay(currentOperatorId, '');
+  let keys = [];
+  try{ keys = await storeList(prefix); }catch(e){ keys = []; }
+  for(const k of keys){
+    const dateIso = k.slice(prefix.length);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(dateIso) || dateIso === todayISO()) continue;
+    try{
+      const r = await storeGet(k);
+      if(!r) continue;
+      const obj = JSON.parse(r.value);
+      await upsertDailyRow(dateIso, obj.refeicoes||[], obj.treinos||[], weightOnOrBefore(dateIso));
+    }catch(e){}
+  }
+  weightLog.forEach(async (w)=>{
+    if(w.date === todayISO()) return;
+    try{
+      const existing = sqlDb.exec('SELECT date FROM daily WHERE date = ?', [w.date]);
+      if(!existing || existing.length===0 || existing[0].values.length===0){
+        await upsertDailyRow(w.date, [], [], w.peso);
+      }
+    }catch(e){}
+  });
+}
+
+function queryAll(sql, params){
+  if(!sqliteReady) return [];
+  try{
+    const res = sqlDb.exec(sql, params||[]);
+    if(!res || res.length===0) return [];
+    const cols = res[0].columns;
+    return res[0].values.map(row=>{
+      const obj = {};
+      cols.forEach((c,i)=> obj[c]=row[i]);
+      return obj;
+    });
+  }catch(e){ console.warn('Erro na consulta SQLite:', e); return []; }
+}
+
+function renderCharts(){
+  if(!sqliteReady || typeof Chart === 'undefined') return;
+  const rows = queryAll('SELECT * FROM daily ORDER BY date ASC');
+  if(rows.length === 0) return;
+
+  const isGanho = profile.tipoObjetivo === 'superavit';
+  document.getElementById('chartDeficitTitle').textContent = isGanho ? 'Histórico de Superávit' : 'Histórico de Déficit';
+  document.getElementById('historyEyebrow').textContent = rows.length + ' dias registrados';
+
+  const fmtLabel = d => d.slice(8,10) + '/' + d.slice(5,7);
+
+  /* peso */
+  const pesoRows = rows.filter(r=> r.peso !== null && r.peso !== undefined);
+  const cvPeso = document.getElementById('chartPeso');
+  if(chartPesoInstance) chartPesoInstance.destroy();
+  if(pesoRows.length > 0){
+    chartPesoInstance = new Chart(cvPeso.getContext('2d'), {
+      type:'line',
+      data:{
+        labels: pesoRows.map(r=>fmtLabel(r.date)),
+        datasets:[
+          { label:'Peso', data: pesoRows.map(r=>r.peso), borderColor:'#3E7BFA', backgroundColor:'rgba(62,123,250,0.12)', fill:true, tension:0.35, pointRadius:3, pointBackgroundColor:'#3E7BFA' },
+          { label:'Meta', data: pesoRows.map(()=>profile.pesoObjetivo), borderColor:'#E3B94D', borderDash:[6,4], pointRadius:0, borderWidth:1.5 }
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ labels:{ color:'#9CA3AF', font:{family:'Inter', size:11} } } },
+        scales:{
+          x:{ ticks:{ color:'#9CA3AF', font:{size:10} }, grid:{ color:'rgba(255,255,255,0.05)' } },
+          y:{ ticks:{ color:'#9CA3AF', font:{size:10} }, grid:{ color:'rgba(255,255,255,0.05)' } }
+        }
+      }
+    });
+  }
+
+  /* deficit/superavit history */
+  const recent = rows.slice(-30);
+  const cvDef = document.getElementById('chartDeficit');
+  if(chartDeficitInstance) chartDeficitInstance.destroy();
+  chartDeficitInstance = new Chart(cvDef.getContext('2d'), {
+    type:'bar',
+    data:{
+      labels: recent.map(r=>fmtLabel(r.date)),
+      datasets:[{
+        data: recent.map(r=>Math.round(r.resultado)),
+        backgroundColor: recent.map(r=> r.hit ? '#E3B94D' : 'rgba(255,255,255,0.12)'),
+        borderRadius:4, maxBarThickness:18
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ ticks:{ color:'#9CA3AF', font:{size:9}, maxRotation:0, autoSkip:true, maxTicksLimit:8 }, grid:{ display:false } },
+        y:{ ticks:{ color:'#9CA3AF', font:{size:10} }, grid:{ color:'rgba(255,255,255,0.05)' } }
+      }
+    }
+  });
+
+  /* calorias in vs out */
+  const recentCal = rows.slice(-14);
+  const cvCal = document.getElementById('chartCalorias');
+  if(chartCaloriasInstance) chartCaloriasInstance.destroy();
+  chartCaloriasInstance = new Chart(cvCal.getContext('2d'), {
+    type:'line',
+    data:{
+      labels: recentCal.map(r=>fmtLabel(r.date)),
+      datasets:[
+        { label:'Ingeridas', data: recentCal.map(r=>Math.round(r.kcal)), borderColor:'#8B5CF6', backgroundColor:'rgba(139,92,246,0.1)', tension:0.3, pointRadius:2, fill:true },
+        { label:'Gasto', data: recentCal.map(r=>Math.round(r.gasto_total)), borderColor:'#E3B94D', borderDash:[5,3], pointRadius:0, fill:false }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ color:'#9CA3AF', font:{family:'Inter', size:11} } } },
+      scales:{
+        x:{ ticks:{ color:'#9CA3AF', font:{size:9}, maxRotation:0, autoSkip:true, maxTicksLimit:7 }, grid:{ display:false } },
+        y:{ ticks:{ color:'#9CA3AF', font:{size:10} }, grid:{ color:'rgba(255,255,255,0.05)' } }
+      }
+    }
+  });
 }
 
 /* ---------- XP / LEVEL ---------- */
@@ -914,6 +1187,8 @@ async function loadAll(){
 
   await updateStreak();
   await checkDeficitReward();
+  await initSqlite();
+  await syncTodayToSqlite();
 
   document.getElementById('operatorSelectOverlay').classList.remove('open');
   document.getElementById('onboardingOverlay').classList.remove('open');
@@ -1063,6 +1338,7 @@ function renderLog(){
       if(btn.dataset.type === 'refeicao') day.refeicoes = day.refeicoes.filter(r=>r.id!==btn.dataset.id);
       else day.treinos = day.treinos.filter(t=>t.id!==btn.dataset.id);
       await saveDay();
+      await syncTodayToSqlite();
       render();
     });
   });
@@ -1195,6 +1471,7 @@ document.getElementById('btnAddFood').addEventListener('click', async ()=>{
   day.refeicoes.push(entry);
   await saveDay();
   await checkDeficitReward();
+  await syncTodayToSqlite();
   render();
 });
 
@@ -1219,6 +1496,7 @@ document.getElementById('btnAddWorkout').addEventListener('click', async ()=>{
   await saveProfile();
   await awardXP(100, 'Treino registrado');
   await checkDeficitReward();
+  await syncTodayToSqlite();
   render();
 });
 
@@ -1231,6 +1509,7 @@ document.getElementById('btnSetPeso').addEventListener('click', async ()=>{
   await saveWeightLog();
   document.getElementById('pesoInput').value='';
   await checkDeficitReward();
+  await syncTodayToSqlite();
   render();
 });
 
@@ -1295,6 +1574,7 @@ document.getElementById('btnSaveSettings').addEventListener('click', async ()=>{
   day.deficitAwarded = false;
   await saveDay();
   await saveProfile();
+  await syncTodayToSqlite();
   settingsModal.classList.remove('open');
   render();
 });
