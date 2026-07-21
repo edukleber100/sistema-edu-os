@@ -498,21 +498,47 @@ button.secondary:hover{border-color:rgba(255,255,255,0.2);}
   <div class="footer-note" id="footerNote">Sistema v2.0 — cada ação é experiência</div>
 </div>
 
-<!-- SELEÇÃO DE PERSONAGEM -->
-<div class="overlay" id="operatorSelectOverlay" style="z-index:75;">
+<!-- LOGIN -->
+<div class="overlay" id="loginOverlay" style="z-index:75;">
   <div class="modal">
-    <h2>Selecionar Personagem</h2>
-    <div class="subtitle">Personagens registrados neste Sistema. Escolha um para continuar sua evolução.</div>
-    <div id="operatorSelectList"></div>
-    <button class="primary" id="btnNewOperator" style="margin-top:14px;">+ Criar novo personagem</button>
+    <h2>Entrar no Sistema</h2>
+    <div class="subtitle">Informe seu usuário e senha para continuar sua evolução.</div>
+    <div class="field"><label>Usuário</label><input type="text" id="loginUsername" placeholder="Ex: edu"></div>
+    <div class="field"><label>Senha</label><input type="password" id="loginPassword" placeholder="••••••••"></div>
+    <div class="hint" style="color:#F87171; display:none;" id="loginError"></div>
+    <button class="primary" id="btnLogin" style="margin-top:6px;">Entrar</button>
+    <div style="text-align:center; margin-top:14px;">
+      <button type="button" id="btnGoSignup" style="background:none; border:none; color:var(--text-sec); font-family:var(--ui); font-size:12px; cursor:pointer;">Não tem conta? <span style="color:var(--blue); font-weight:600;">Criar conta</span></button>
+    </div>
+    <div id="claimListWrap" style="display:none; margin-top:18px; padding-top:16px; border-top:1px solid var(--line);">
+      <div class="subtitle" style="margin-bottom:10px;">Personagens sem login configurado neste dispositivo:</div>
+      <div id="claimList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- VINCULAR CONTA (dados já existentes) -->
+<div class="overlay" id="claimOverlay" style="z-index:80;">
+  <div class="modal">
+    <h2>Vincular Conta</h2>
+    <div class="subtitle" id="claimSubtitle">Encontramos dados já salvos neste dispositivo. Crie um usuário e senha para vincular sua conta e continuar de onde parou.</div>
+    <div class="field"><label>Usuário</label><input type="text" id="claimUsername" placeholder="Ex: edu"></div>
+    <div class="field"><label>Senha</label><input type="password" id="claimPassword" placeholder="Mínimo 4 caracteres"></div>
+    <div class="field"><label>Confirmar senha</label><input type="password" id="claimPasswordConfirm" placeholder="Repita a senha"></div>
+    <div class="hint" style="color:#F87171; display:none;" id="claimError"></div>
+    <button class="primary" id="btnClaim" style="margin-top:6px;">Vincular conta</button>
   </div>
 </div>
 
 <!-- CRIAÇÃO DE PERSONAGEM -->
-<div class="overlay open" id="onboardingOverlay" style="z-index:80;">
+<div class="overlay" id="onboardingOverlay" style="z-index:80;">
   <div class="modal">
-    <h2>Criação de Personagem</h2>
-    <div class="subtitle">Novo personagem detectado. Informe os dados para calibrar o Sistema.</div>
+    <h2>Criar Conta</h2>
+    <div class="subtitle">Nova conta, começando do zero. Informe os dados para calibrar o Sistema.</div>
+    <div class="field-row">
+      <div class="field"><label>Usuário</label><input type="text" id="obUsername" placeholder="Ex: edu"></div>
+      <div class="field"><label>Senha</label><input type="password" id="obPassword" placeholder="Mínimo 4 caracteres"></div>
+    </div>
     <div class="field"><label>Nome do personagem</label><input type="text" id="obNome" placeholder="Ex: Edu"></div>
     <div class="field-row">
       <div class="field"><label>Peso atual (kg)</label><input type="number" id="obPeso" step="0.1" placeholder="Ex: 89"></div>
@@ -538,9 +564,9 @@ button.secondary:hover{border-color:rgba(255,255,255,0.2);}
     <div class="field"><label id="obDeficitLabel">Déficit mínimo diário (kcal)</label><input type="number" id="obDeficit" step="10" value="700"></div>
     <div class="field"><label>Proteína mínima diária (g)</label><input type="number" id="obProteina" step="5" value="130"></div>
     <div class="hint" style="color:#F87171; display:none;" id="obError"></div>
-    <button class="primary" id="btnStartMission" style="margin-top:6px;">Começar jornada</button>
-    <div id="onboardingCancelWrap" style="display:none; text-align:center; margin-top:12px;">
-      <button type="button" id="btnCancelOnboarding" style="background:none; border:none; color:var(--text-sec); font-family:var(--ui); font-size:12px; cursor:pointer;">‹ Voltar para seleção de personagem</button>
+    <button class="primary" id="btnStartMission" style="margin-top:6px;">Criar conta e começar</button>
+    <div style="display:block; text-align:center; margin-top:12px;" id="onboardingCancelWrap">
+      <button type="button" id="btnCancelOnboarding" style="background:none; border:none; color:var(--text-sec); font-family:var(--ui); font-size:12px; cursor:pointer;">‹ Já tenho conta, voltar para login</button>
     </div>
   </div>
 </div>
@@ -575,8 +601,9 @@ button.secondary:hover{border-color:rgba(255,255,255,0.2);}
     <div class="field"><label>Proteína mínima diária (g)</label><input type="number" id="cfgProteinaMeta" step="5"></div>
     <button class="primary" id="btnSaveSettings">Salvar parâmetros</button>
 
-    <div class="section-title" style="margin-top:20px;"><h2 style="font-size:13px;">Personagem</h2></div>
-    <button class="secondary" id="btnSwitchOperator">Trocar de personagem</button>
+    <div class="section-title" style="margin-top:20px;"><h2 style="font-size:13px;">Conta</h2></div>
+    <button class="secondary" id="btnLogout">Sair (logout)</button>
+    <button class="secondary" id="btnDeleteAccount" style="margin-top:8px; color:#F87171; border-color:rgba(248,113,113,0.3);">Excluir esta conta permanentemente</button>
   </div>
 </div>
 
@@ -1014,6 +1041,19 @@ function computeTotals(){
 }
 
 /* ---------- BOOTSTRAP / OPERATORS ---------- */
+async function hashPassword(pw){
+  try{
+    const enc = new TextEncoder().encode(pw);
+    const buf = await crypto.subtle.digest('SHA-256', enc);
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }catch(e){
+    // fallback simples caso crypto.subtle não esteja disponível (contextos não seguros)
+    let h = 0;
+    for(let i=0;i<pw.length;i++){ h = ((h<<5)-h) + pw.charCodeAt(i); h|=0; }
+    return 'fb' + Math.abs(h).toString(16);
+  }
+}
+
 async function bootstrap(){
   try{
     const o = await storeGet('operators');
@@ -1031,54 +1071,138 @@ async function bootstrap(){
     }catch(e){}
   }
 
-  if(operatorsList.length === 0) showOnboarding(false);
-  else if(operatorsList.length === 1) selectOperator(operatorsList[0].id);
-  else showOperatorSelect();
+  const semLogin = operatorsList.filter(o=> !o.username);
+  if(operatorsList.length > 0 && semLogin.length === operatorsList.length){
+    // todos os personagens existentes são de antes do login existir: oferece vincular
+    showLogin();
+    return;
+  }
+  if(operatorsList.length === 0){
+    showOnboarding(false);
+  } else {
+    showLogin();
+  }
 }
 
-function showOperatorSelect(){
+function showLogin(){
   document.getElementById('mainWrap').style.display = 'none';
   document.getElementById('onboardingOverlay').classList.remove('open');
-  const list = document.getElementById('operatorSelectList');
-  list.innerHTML = '';
-  operatorsList.forEach(op=>{
-    const row = document.createElement('div');
-    row.className = 'op-row';
-    row.innerHTML = `
-      <div class="op-name">${op.nome}</div>
-      <div class="op-actions">
-        <button class="op-select-btn" data-select="${op.id}">selecionar</button>
-        <button class="op-del-btn" data-remove="${op.id}">excluir</button>
-      </div>`;
-    list.appendChild(row);
-  });
-  list.querySelectorAll('[data-select]').forEach(btn=> btn.addEventListener('click', ()=> selectOperator(btn.dataset.select)));
-  list.querySelectorAll('[data-remove]').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const op = operatorsList.find(o=>o.id===btn.dataset.remove);
-      if(!confirm('Excluir o personagem "' + op.nome + '" e todos os dados dele? Essa ação não pode ser desfeita.')) return;
-      await storeDelete(keyProfile(op.id));
-      await storeDelete(keyWeightLog(op.id));
-      await storeDelete(keyCustomFoods(op.id));
-      await storeDelete(keyDay(op.id, todayISO()));
-      operatorsList = operatorsList.filter(o=>o.id!==op.id);
-      await storeSet('operators', JSON.stringify(operatorsList));
-      operatorsList.length === 0 ? showOnboarding(false) : showOperatorSelect();
+  document.getElementById('claimOverlay').classList.remove('open');
+  document.getElementById('loginUsername').value = '';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginError').style.display = 'none';
+
+  const semLogin = operatorsList.filter(o=> !o.username);
+  const wrap = document.getElementById('claimListWrap');
+  const list = document.getElementById('claimList');
+  if(semLogin.length > 0){
+    wrap.style.display = 'block';
+    list.innerHTML = '';
+    semLogin.forEach(op=>{
+      const row = document.createElement('div');
+      row.className = 'op-row';
+      row.innerHTML = `<div class="op-name">${op.nome}</div><div class="op-actions"><button class="op-select-btn" data-claim="${op.id}">configurar login</button></div>`;
+      list.appendChild(row);
     });
-  });
-  document.getElementById('operatorSelectOverlay').classList.add('open');
+    list.querySelectorAll('[data-claim]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const op = operatorsList.find(o=>o.id===btn.dataset.claim);
+        showClaim(op.id, op.nome);
+      });
+    });
+  } else {
+    wrap.style.display = 'none';
+  }
+  document.getElementById('loginOverlay').classList.add('open');
 }
+
+async function attemptLogin(){
+  const username = document.getElementById('loginUsername').value.trim().toLowerCase();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  if(!username || !password){
+    errEl.textContent = 'Informe usuário e senha.'; errEl.style.display='block'; return;
+  }
+  const op = operatorsList.find(o=> o.username === username);
+  if(!op){
+    errEl.textContent = 'Usuário não encontrado.'; errEl.style.display='block'; return;
+  }
+  const hash = await hashPassword(password);
+  if(hash !== op.passwordHash){
+    errEl.textContent = 'Senha incorreta.'; errEl.style.display='block'; return;
+  }
+  errEl.style.display='none';
+  document.getElementById('loginOverlay').classList.remove('open');
+  await selectOperator(op.id);
+}
+document.getElementById('btnLogin').addEventListener('click', attemptLogin);
+document.getElementById('loginPassword').addEventListener('keydown', (e)=>{ if(e.key==='Enter') attemptLogin(); });
+document.getElementById('btnGoSignup').addEventListener('click', ()=> showOnboarding(true));
+
+function showClaim(operatorId, operatorNome){
+  document.getElementById('loginOverlay').classList.remove('open');
+  document.getElementById('claimUsername').value = '';
+  document.getElementById('claimPassword').value = '';
+  document.getElementById('claimPasswordConfirm').value = '';
+  document.getElementById('claimError').style.display = 'none';
+  document.getElementById('claimSubtitle').textContent = 'Encontramos dados já salvos neste dispositivo para "' + operatorNome + '". Crie um usuário e senha para vincular sua conta e continuar de onde parou.';
+  document.getElementById('claimOverlay').dataset.targetId = operatorId;
+  document.getElementById('claimOverlay').classList.add('open');
+}
+
+async function completeClaim(){
+  const overlay = document.getElementById('claimOverlay');
+  const targetId = overlay.dataset.targetId;
+  const username = document.getElementById('claimUsername').value.trim().toLowerCase();
+  const password = document.getElementById('claimPassword').value;
+  const confirmPw = document.getElementById('claimPasswordConfirm').value;
+  const errEl = document.getElementById('claimError');
+
+  if(!username || !password){
+    errEl.textContent = 'Preencha usuário e senha.'; errEl.style.display='block'; return;
+  }
+  if(password.length < 4){
+    errEl.textContent = 'A senha deve ter pelo menos 4 caracteres.'; errEl.style.display='block'; return;
+  }
+  if(password !== confirmPw){
+    errEl.textContent = 'As senhas não coincidem.'; errEl.style.display='block'; return;
+  }
+  if(operatorsList.some(o=> o.username === username)){
+    errEl.textContent = 'Esse usuário já está em uso.'; errEl.style.display='block'; return;
+  }
+
+  const passwordHash = await hashPassword(password);
+  try{
+    const p = await storeGet(keyProfile(targetId));
+    const targetProfile = p ? JSON.parse(p.value) : {};
+    targetProfile.username = username;
+    targetProfile.passwordHash = passwordHash;
+    await storeSet(keyProfile(targetId), JSON.stringify(targetProfile));
+  }catch(e){}
+
+  const opIdx = operatorsList.findIndex(o=> o.id===targetId);
+  if(opIdx>=0){ operatorsList[opIdx].username = username; operatorsList[opIdx].passwordHash = passwordHash; }
+  await storeSet('operators', JSON.stringify(operatorsList));
+
+  errEl.style.display='none';
+  document.getElementById('claimOverlay').classList.remove('open');
+  await selectOperator(targetId);
+}
+document.getElementById('btnClaim').addEventListener('click', completeClaim);
 
 async function selectOperator(id){
   currentOperatorId = id;
-  document.getElementById('operatorSelectOverlay').classList.remove('open');
+  document.getElementById('loginOverlay').classList.remove('open');
+  document.getElementById('claimOverlay').classList.remove('open');
   await loadAll();
 }
 
-function showOnboarding(fromSelector){
+function showOnboarding(fromLogin){
   document.getElementById('mainWrap').style.display = 'none';
-  document.getElementById('operatorSelectOverlay').classList.remove('open');
-  document.getElementById('onboardingCancelWrap').style.display = fromSelector ? 'block' : 'none';
+  document.getElementById('loginOverlay').classList.remove('open');
+  document.getElementById('claimOverlay').classList.remove('open');
+  document.getElementById('onboardingCancelWrap').style.display = fromLogin ? 'block' : 'none';
+  document.getElementById('obUsername').value=''; document.getElementById('obPassword').value='';
   document.getElementById('obNome').value=''; document.getElementById('obPeso').value='';
   document.getElementById('obObjetivo').value=''; document.getElementById('obAltura').value='';
   document.getElementById('obIdade').value=''; document.getElementById('obDeficit').value=700;
@@ -1095,6 +1219,8 @@ document.getElementById('obTipoObjetivo').addEventListener('change', (e)=>{
 });
 
 async function completeOnboarding(){
+  const username = document.getElementById('obUsername').value.trim().toLowerCase();
+  const password = document.getElementById('obPassword').value;
   const nome = document.getElementById('obNome').value.trim();
   const pesoAtualVal = parseFloat(document.getElementById('obPeso').value);
   const pesoObjetivoVal = parseFloat(document.getElementById('obObjetivo').value);
@@ -1105,25 +1231,37 @@ async function completeOnboarding(){
   const deficitMeta = parseFloat(document.getElementById('obDeficit').value) || 700;
   const proteinaMeta = parseFloat(document.getElementById('obProteina').value) || 130;
 
-  if(!nome || !pesoAtualVal || !pesoObjetivoVal || !altura || !idade){
-    document.getElementById('obError').textContent = 'Preencha todos os campos obrigatórios para iniciar a jornada.';
-    document.getElementById('obError').style.display = 'block';
+  const errEl = document.getElementById('obError');
+  if(!username || !password || !nome || !pesoAtualVal || !pesoObjetivoVal || !altura || !idade){
+    errEl.textContent = 'Preencha todos os campos obrigatórios para iniciar a jornada.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if(password.length < 4){
+    errEl.textContent = 'A senha deve ter pelo menos 4 caracteres.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if(operatorsList.some(o=> o.username === username)){
+    errEl.textContent = 'Esse usuário já está em uso. Escolha outro.';
+    errEl.style.display = 'block';
     return;
   }
   if(tipoObjetivo === 'deficit' && pesoObjetivoVal >= pesoAtualVal){
-    document.getElementById('obError').textContent = 'Para perder peso, o peso objetivo deve ser menor que o peso atual.';
-    document.getElementById('obError').style.display = 'block';
+    errEl.textContent = 'Para perder peso, o peso objetivo deve ser menor que o peso atual.';
+    errEl.style.display = 'block';
     return;
   }
   if(tipoObjetivo === 'superavit' && pesoObjetivoVal <= pesoAtualVal){
-    document.getElementById('obError').textContent = 'Para ganhar peso, o peso objetivo deve ser maior que o peso atual.';
-    document.getElementById('obError').style.display = 'block';
+    errEl.textContent = 'Para ganhar peso, o peso objetivo deve ser maior que o peso atual.';
+    errEl.style.display = 'block';
     return;
   }
 
+  const passwordHash = await hashPassword(password);
   const id = uid();
   profile = {
-    nomeOperador: nome, pesoInicial: pesoAtualVal, pesoObjetivo: pesoObjetivoVal,
+    nomeOperador: nome, username, passwordHash, pesoInicial: pesoAtualVal, pesoObjetivo: pesoObjetivoVal,
     altura, idade, sexo, tipoObjetivo, deficitMeta, proteinaMeta,
     xp:0, streakCount:0, workoutsCount:0, proteinGoalHitCount:0,
     createdDate: todayISO(), lastActiveDate: null, lastWeeklyRewardWeek: null
@@ -1136,14 +1274,14 @@ async function completeOnboarding(){
   await storeSet(keyWeightLog(id), JSON.stringify(weightLog));
   await storeSet(keyDay(id, todayISO()), JSON.stringify(day));
 
-  operatorsList.push({id, nome});
+  operatorsList.push({id, nome, username, passwordHash});
   await storeSet('operators', JSON.stringify(operatorsList));
   await selectOperator(id);
 }
 
 document.getElementById('btnStartMission').addEventListener('click', completeOnboarding);
-document.getElementById('btnNewOperator').addEventListener('click', ()=> showOnboarding(true));
-document.getElementById('btnCancelOnboarding').addEventListener('click', ()=> showOperatorSelect());
+document.getElementById('btnCancelOnboarding').addEventListener('click', ()=> showLogin());
+
 
 async function saveDay(){ await storeSet(keyDay(currentOperatorId, todayISO()), JSON.stringify(day)); }
 async function saveProfile(){ await storeSet(keyProfile(currentOperatorId), JSON.stringify(profile)); }
@@ -1154,7 +1292,7 @@ async function loadAll(){
     const p = await storeGet(keyProfile(currentOperatorId));
     profile = p ? JSON.parse(p.value) : null;
   }catch(e){ profile = null; }
-  if(!profile){ showOperatorSelect(); return; }
+  if(!profile){ showLogin(); return; }
 
   if(profile.altura === undefined){ profile.altura=175; profile.idade=30; profile.sexo='M'; }
   if(profile.nomeOperador === undefined) profile.nomeOperador = 'Personagem';
@@ -1190,7 +1328,8 @@ async function loadAll(){
   await initSqlite();
   await syncTodayToSqlite();
 
-  document.getElementById('operatorSelectOverlay').classList.remove('open');
+  document.getElementById('loginOverlay').classList.remove('open');
+  document.getElementById('claimOverlay').classList.remove('open');
   document.getElementById('onboardingOverlay').classList.remove('open');
   document.getElementById('mainWrap').style.display = 'block';
 
@@ -1579,9 +1718,30 @@ document.getElementById('btnSaveSettings').addEventListener('click', async ()=>{
   render();
 });
 
-document.getElementById('btnSwitchOperator').addEventListener('click', ()=>{
+document.getElementById('btnLogout').addEventListener('click', ()=>{
   settingsModal.classList.remove('open');
-  showOperatorSelect();
+  currentOperatorId = null;
+  showLogin();
+});
+
+document.getElementById('btnDeleteAccount').addEventListener('click', async ()=>{
+  if(!confirm('Excluir sua conta "' + profile.nomeOperador + '" e TODOS os seus dados permanentemente? Essa ação não pode ser desfeita.')) return;
+  const typed = prompt('Para confirmar, digite seu usuário (' + profile.username + '):');
+  if((typed||'').trim().toLowerCase() !== profile.username){
+    alert('Usuário não confere. Nada foi excluído.');
+    return;
+  }
+  const id = currentOperatorId;
+  await storeDelete(keyProfile(id));
+  await storeDelete(keyWeightLog(id));
+  await storeDelete(keyCustomFoods(id));
+  await storeDelete(keyDay(id, todayISO()));
+  await storeDelete(keySqliteDb(id));
+  operatorsList = operatorsList.filter(o=>o.id!==id);
+  await storeSet('operators', JSON.stringify(operatorsList));
+  settingsModal.classList.remove('open');
+  currentOperatorId = null;
+  showLogin();
 });
 
 bootstrap();
