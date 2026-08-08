@@ -422,6 +422,7 @@ button.secondary:hover{border-color:rgba(255,255,255,0.2);}
         <label>Alimento</label>
         <div style="display:flex; gap:8px;">
           <select id="foodSelect" style="flex:1;"></select>
+          <button type="button" id="btnEditFood" title="Editar valores deste alimento" style="background:transparent; border:1px solid var(--line); color:var(--text-sec); font-family:var(--ui); font-size:12px; padding:0 12px; cursor:pointer; white-space:nowrap; border-radius:10px;">editar</button>
           <button type="button" id="btnDeleteCustomFood" title="Excluir este alimento salvo" style="display:none; background:transparent; border:1px solid var(--line); color:#F87171; font-family:var(--ui); font-size:12px; padding:0 12px; cursor:pointer; white-space:nowrap; border-radius:10px;">excluir</button>
         </div>
       </div>
@@ -571,6 +572,30 @@ button.secondary:hover{border-color:rgba(255,255,255,0.2);}
   </div>
 </div>
 
+<!-- EDITAR ALIMENTO -->
+<div class="overlay" id="editFoodModal">
+  <div class="modal">
+    <button class="modal-close" id="closeEditFood">✕</button>
+    <h2>Editar Alimento</h2>
+    <div class="subtitle" id="efBasisHint">Valores por 100g</div>
+    <div class="field"><label>Nome</label><input type="text" id="efNome"></div>
+    <div class="field" id="efUnitWeightWrap">
+      <label id="efUnitWeightLabel">Peso por unidade (g)</label>
+      <input type="number" id="efUnitWeight" min="0" step="1">
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Kcal</label><input type="number" id="efKcal" min="0"></div>
+      <div class="field"><label>Proteína (g)</label><input type="number" id="efProt" min="0"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Carbo (g)</label><input type="number" id="efCarb" min="0"></div>
+      <div class="field"><label>Gordura (g)</label><input type="number" id="efGord" min="0"></div>
+    </div>
+    <button class="primary" id="btnSaveEditFood">Salvar alterações</button>
+    <button class="secondary" id="btnResetEditFood" style="margin-top:8px; display:none;">Restaurar valores originais</button>
+  </div>
+</div>
+
 <!-- SETTINGS -->
 <div class="overlay" id="settingsModal">
   <div class="modal">
@@ -644,7 +669,9 @@ const FOODS = {
 };
 
 let customFoods = {};
-function getFood(key){ return FOODS[key] || customFoods[key]; }
+let foodOverrides = {};
+function getFood(key){ return foodOverrides[key] || FOODS[key] || customFoods[key]; }
+function keyFoodOverrides(id){ return id==='default' ? 'food-overrides' : 'food-overrides:'+id; }
 
 const WORKOUT_MET = { musculacao:5, caminhada:3.5, corrida:9, striker:8, artesmarciais:8, bicicleta:7, hiit:8.5, escada:7 };
 const WORKOUT_LABEL = { musculacao:"Musculação", caminhada:"Caminhada", corrida:"Corrida", striker:"Striker / Trocação", artesmarciais:"Artes marciais", bicicleta:"Bicicleta", hiit:"HIIT", escada:"Escada (stepper)" };
@@ -1323,6 +1350,11 @@ async function loadAll(){
     customFoods = cf ? JSON.parse(cf.value) : {};
   }catch(e){ customFoods = {}; }
 
+  try{
+    const fo = await storeGet(keyFoodOverrides(currentOperatorId));
+    foodOverrides = fo ? JSON.parse(fo.value) : {};
+  }catch(e){ foodOverrides = {}; }
+
   await updateStreak();
   await checkDeficitReward();
   await initSqlite();
@@ -1492,7 +1524,7 @@ function populateFoodSelect(){
   sel.innerHTML = '';
   Object.keys(FOODS).forEach(k=>{
     const opt = document.createElement('option');
-    opt.value = k; opt.textContent = FOODS[k].label;
+    opt.value = k; opt.textContent = getFood(k).label;
     sel.appendChild(opt);
   });
   const customKeys = Object.keys(customFoods);
@@ -1521,7 +1553,9 @@ function onFoodChange(){
   const gramsInput = document.getElementById('foodGrams');
   const unitHint = document.getElementById('unitWeightHint');
   const delBtn = document.getElementById('btnDeleteCustomFood');
+  const editBtn = document.getElementById('btnEditFood');
   delBtn.style.display = customFoods[key] ? 'block' : 'none';
+  editBtn.style.display = food.unitType === 'manual' ? 'none' : 'block';
   gramsInput.value = '';
   if(food.unitType === 'manual'){
     manualFields.style.display = 'block'; qtyField.style.display = 'none';
@@ -1622,6 +1656,107 @@ document.getElementById('btnDeleteCustomFood').addEventListener('click', async (
   delete customFoods[key];
   await storeSet(keyCustomFoods(currentOperatorId), JSON.stringify(customFoods));
   populateFoodSelect();
+});
+
+/* ---------- EDITAR ALIMENTO ---------- */
+let editFoodTargetKey = null;
+const editFoodModal = document.getElementById('editFoodModal');
+
+function openEditFood(key){
+  const food = getFood(key);
+  if(!food || food.unitType === 'manual') return;
+  editFoodTargetKey = key;
+
+  document.getElementById('efNome').value = food.label;
+  const isBuiltIn = !!FOODS[key];
+  document.getElementById('btnResetEditFood').style.display = (isBuiltIn && foodOverrides[key]) ? 'block' : 'none';
+
+  const unitWrap = document.getElementById('efUnitWeightWrap');
+  const unitLabel = document.getElementById('efUnitWeightLabel');
+  const unitInput = document.getElementById('efUnitWeight');
+  const basisHint = document.getElementById('efBasisHint');
+
+  if(food.unitType === 'gram'){
+    unitWrap.style.display = 'block';
+    unitLabel.textContent = 'Peso por unidade (g)';
+    unitInput.value = food.unitWeight;
+    basisHint.textContent = 'Valores por 100g';
+    document.getElementById('efKcal').value = food.per100.kcal;
+    document.getElementById('efProt').value = food.per100.prot;
+    document.getElementById('efCarb').value = food.per100.carb;
+    document.getElementById('efGord').value = food.per100.gord;
+  } else if(food.unitType === 'scoop'){
+    unitWrap.style.display = 'block';
+    unitLabel.textContent = 'Peso por scoop (g)';
+    unitInput.value = food.gramsPerUnit;
+    basisHint.textContent = 'Valores por scoop';
+    document.getElementById('efKcal').value = food.kcal;
+    document.getElementById('efProt').value = food.prot;
+    document.getElementById('efCarb').value = food.carb;
+    document.getElementById('efGord').value = food.gord;
+  } else if(food.unitType === 'fixed'){
+    unitWrap.style.display = 'none';
+    basisHint.textContent = 'Valores por porção salva';
+    document.getElementById('efKcal').value = food.kcal;
+    document.getElementById('efProt').value = food.prot;
+    document.getElementById('efCarb').value = food.carb;
+    document.getElementById('efGord').value = food.gord;
+  }
+  editFoodModal.classList.add('open');
+}
+
+document.getElementById('btnEditFood').addEventListener('click', ()=>{
+  openEditFood(document.getElementById('foodSelect').value);
+});
+document.getElementById('closeEditFood').addEventListener('click', ()=> editFoodModal.classList.remove('open'));
+editFoodModal.addEventListener('click', (e)=>{ if(e.target===editFoodModal) editFoodModal.classList.remove('open'); });
+
+document.getElementById('btnSaveEditFood').addEventListener('click', async ()=>{
+  const key = editFoodTargetKey;
+  const food = getFood(key);
+  if(!key || !food) return;
+
+  const nome = document.getElementById('efNome').value.trim() || food.label;
+  const kcal = parseFloat(document.getElementById('efKcal').value) || 0;
+  const prot = parseFloat(document.getElementById('efProt').value) || 0;
+  const carb = parseFloat(document.getElementById('efCarb').value) || 0;
+  const gord = parseFloat(document.getElementById('efGord').value) || 0;
+  const isBuiltIn = !!FOODS[key];
+
+  let updated;
+  if(food.unitType === 'gram'){
+    const unitWeight = parseFloat(document.getElementById('efUnitWeight').value) || food.unitWeight;
+    updated = { label: nome, unitType:'gram', unitWeight, per100:{kcal, prot, carb, gord} };
+  } else if(food.unitType === 'scoop'){
+    const gramsPerUnit = parseFloat(document.getElementById('efUnitWeight').value) || food.gramsPerUnit;
+    updated = { label: nome, unitType:'scoop', gramsPerUnit, kcal, prot, carb, gord };
+  } else if(food.unitType === 'fixed'){
+    updated = { label: nome, unitType:'fixed', kcal, prot, carb, gord };
+  }
+
+  if(isBuiltIn){
+    foodOverrides[key] = updated;
+    await storeSet(keyFoodOverrides(currentOperatorId), JSON.stringify(foodOverrides));
+  } else {
+    customFoods[key] = updated;
+    await storeSet(keyCustomFoods(currentOperatorId), JSON.stringify(customFoods));
+  }
+
+  editFoodModal.classList.remove('open');
+  populateFoodSelect();
+  document.getElementById('foodSelect').value = key;
+  onFoodChange();
+});
+
+document.getElementById('btnResetEditFood').addEventListener('click', async ()=>{
+  const key = editFoodTargetKey;
+  if(!key) return;
+  delete foodOverrides[key];
+  await storeSet(keyFoodOverrides(currentOperatorId), JSON.stringify(foodOverrides));
+  editFoodModal.classList.remove('open');
+  populateFoodSelect();
+  document.getElementById('foodSelect').value = key;
+  onFoodChange();
 });
 
 document.getElementById('btnAddWorkout').addEventListener('click', async ()=>{
