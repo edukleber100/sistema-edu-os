@@ -642,6 +642,18 @@ button.secondary:hover{border-color:rgba(255,255,255,0.2);}
   </div>
 </div>
 
+<!-- META ALCANÇADA -->
+<div class="overlay" id="goalCelebrationOverlay" style="z-index:95;">
+  <div class="modal" style="max-width:460px; text-align:center; border-color:var(--gold); box-shadow:0 0 40px rgba(227,185,77,0.15), var(--shadow);">
+    <button class="modal-close" id="closeGoalCelebration">✕</button>
+    <div style="font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--gold); margin-bottom:10px;">Missão Cumprida</div>
+    <div style="font-family:var(--num); font-size:26px; font-weight:700; margin-bottom:6px;" id="gcTitle">Meta Alcançada!</div>
+    <div class="subtitle" id="gcSubtitle" style="margin-bottom:20px;"></div>
+    <div class="detail-grid" id="gcStatsGrid" style="text-align:left; margin-bottom:22px;"></div>
+    <button class="primary" id="btnCloseGoalCelebration">Continuar evoluindo</button>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
 <script>
@@ -1005,6 +1017,53 @@ document.getElementById('levelUpOverlay').addEventListener('click', ()=>{
   document.getElementById('levelUpOverlay').classList.remove('open');
 });
 
+function showGoalCelebration(){
+  const pa = pesoAtual();
+  const pi = profile.pesoInicial;
+  const po = profile.pesoObjetivo;
+  const isGanho = profile.tipoObjetivo === 'superavit';
+  const totalMudanca = round1(Math.abs(pa - pi));
+  const dias = profile.createdDate
+    ? Math.max(1, Math.floor((new Date() - new Date(profile.createdDate)) / 86400000) + 1)
+    : 1;
+  const li = levelInfo(profile.xp||0);
+
+  let totalDias = 0, diasComMeta = 0;
+  try{
+    const rows = queryAll('SELECT COUNT(*) as total, SUM(hit) as hits FROM daily');
+    if(rows.length){ totalDias = rows[0].total||0; diasComMeta = rows[0].hits||0; }
+  }catch(e){}
+
+  document.getElementById('gcTitle').textContent = isGanho ? 'Peso Alvo Alcançado!' : 'Peso Alvo Alcançado!';
+  document.getElementById('gcSubtitle').textContent = profile.nomeOperador + ' completou a jornada até ' + round1(po) + ' kg.';
+
+  const stats = [
+    ['Peso inicial', round1(pi) + ' kg'],
+    ['Peso final', round1(pa) + ' kg'],
+    [isGanho ? 'Total ganho' : 'Total eliminado', totalMudanca + ' kg'],
+    ['Dias de jornada', dias + ' dias'],
+    ['Nível alcançado', 'Nível ' + li.level],
+    ['Refeições registradas', String(profile.mealsCount||0)],
+    ['Treinos realizados', String(profile.workoutsCount||0)],
+    ['Maior sequência', (profile.longestStreak||0) + ' dias seguidos']
+  ];
+  if(totalDias > 0){
+    stats.push(['Meta batida', diasComMeta + ' de ' + totalDias + ' dias (' + Math.round((diasComMeta/totalDias)*100) + '%)']);
+  }
+
+  document.getElementById('gcStatsGrid').innerHTML = stats.map(([label, value])=>
+    '<div class="detail-row"><span class="dl">' + label + '</span><span class="dv">' + value + '</span></div>'
+  ).join('');
+
+  document.getElementById('goalCelebrationOverlay').classList.add('open');
+}
+document.getElementById('closeGoalCelebration').addEventListener('click', ()=>{
+  document.getElementById('goalCelebrationOverlay').classList.remove('open');
+});
+document.getElementById('btnCloseGoalCelebration').addEventListener('click', ()=>{
+  document.getElementById('goalCelebrationOverlay').classList.remove('open');
+});
+
 function getRank(pct){
   let rank = RANKS[0];
   for(const r of RANKS){ if(pct >= r.min) rank = r; }
@@ -1022,6 +1081,7 @@ async function updateStreak(){
   const y = new Date(); y.setDate(y.getDate()-1);
   const yesterday = isoDate(y);
   profile.streakCount = (profile.lastActiveDate === yesterday) ? (profile.streakCount||0) + 1 : 1;
+  profile.longestStreak = Math.max(profile.longestStreak||0, profile.streakCount);
   profile.lastActiveDate = today;
   await saveProfile();
 }
@@ -1385,6 +1445,11 @@ function render(){
   const progresso = isGanho ? (pa - pi) : (pi - pa);
   const pct = totalMudanca > 0 ? clamp01(progresso/totalMudanca) : 0;
   const metaAlcancada = isGanho ? (pa >= po) : (pa <= po);
+  if(metaAlcancada && !profile.metaCelebrated){
+    profile.metaCelebrated = true;
+    saveProfile();
+    showGoalCelebration();
+  }
 
   const li = levelInfo(profile.xp||0);
   document.getElementById('charLevel').textContent = li.level;
@@ -1642,7 +1707,9 @@ document.getElementById('btnAddFood').addEventListener('click', async ()=>{
     document.getElementById('foodGrams').value = '';
   }
   day.refeicoes.push(entry);
+  profile.mealsCount = (profile.mealsCount||0) + 1;
   await saveDay();
+  await saveProfile();
   await checkDeficitReward();
   await syncTodayToSqlite();
   render();
@@ -1838,7 +1905,9 @@ settingsModal.addEventListener('click', (e)=>{ if(e.target===settingsModal) sett
 document.getElementById('btnSaveSettings').addEventListener('click', async ()=>{
   profile.nomeOperador = document.getElementById('cfgNomeOperador').value.trim() || profile.nomeOperador;
   profile.pesoInicial = parseFloat(document.getElementById('cfgPesoInicial').value) || profile.pesoInicial;
-  profile.pesoObjetivo = parseFloat(document.getElementById('cfgPesoObjetivo').value) || profile.pesoObjetivo;
+  const novaMeta = parseFloat(document.getElementById('cfgPesoObjetivo').value) || profile.pesoObjetivo;
+  if(novaMeta !== profile.pesoObjetivo) profile.metaCelebrated = false;
+  profile.pesoObjetivo = novaMeta;
   profile.altura = parseFloat(document.getElementById('cfgAltura').value) || profile.altura;
   profile.idade = parseFloat(document.getElementById('cfgIdade').value) || profile.idade;
   profile.sexo = document.getElementById('cfgSexo').value;
