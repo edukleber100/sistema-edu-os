@@ -1043,9 +1043,7 @@ function showGoalCelebration(){
     [isGanho ? 'Total ganho' : 'Total eliminado', totalMudanca + ' kg'],
     ['Dias de jornada', dias + ' dias'],
     ['Nível alcançado', 'Nível ' + li.level],
-    ['Refeições registradas', String(profile.mealsCount||0)],
-    ['Treinos realizados', String(profile.workoutsCount||0)],
-    ['Maior sequência', (profile.longestStreak||0) + ' dias seguidos']
+    ['Treinos realizados', String(profile.workoutsCount||0)]
   ];
   if(totalDias > 0){
     stats.push(['Meta batida', diasComMeta + ' de ' + totalDias + ' dias (' + Math.round((diasComMeta/totalDias)*100) + '%)']);
