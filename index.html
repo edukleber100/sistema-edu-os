@@ -964,7 +964,7 @@ function renderCharts(){
       labels: recent.map(r=>fmtLabel(r.date)),
       datasets:[{
         data: recent.map(r=>Math.round(r.resultado)),
-        backgroundColor: recent.map(r=> r.hit ? '#E3B94D' : 'rgba(255,255,255,0.12)'),
+        backgroundColor: recent.map(r=> r.hit ? '#E3B94D' : (profile.tipoObjetivo === 'deficit' ? 'rgba(255,255,255,0.12)' : '#3E7BFA')),
         borderRadius:4, maxBarThickness:18
       }]
     },
